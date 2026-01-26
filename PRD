@@ -1,0 +1,56 @@
+# [PRD] YouTube Shorts Trend Analyzer & Idea Generator
+
+## 1. 프로젝트 개요
+- **서비스명:** new-trend-finder
+- **목표:** 유튜브 쇼츠 데이터(인기 급상승, 아웃라이어 영상)를 AI로 분석하여 중급 크리에이터를 위한 고효율 콘텐츠 아이디어를 생성하고 제작 시간을 단축함.
+- **주요 타겟:** 구독자 성장이 정체되었거나, 다음 영상 소재 선정에 어려움을 겪는 중급 유튜브 크리에이터.
+- **개발 철학:** 바이브 코딩(Vibe Coding)을 통한 신속한 구현 및 배포.
+
+## 2. 기술 스택 (The Vibe Stack)
+- **Framework:** Next.js 14+ (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS, shadcn/ui
+- **AI Engine:** Google Gemini API (Pro/Flash)
+- **Data Fetching:** YouTube Data API v3, youtube-transcript-api (Python-based)
+- **Deployment:** Vercel
+- **Storage:** Local Storage / JSON (No DB 초기 단계)
+
+## 3. 핵심 기능 정의
+
+### 기능 1: 원클릭 트렌드 스카우터 (Trend Scout)
+- **설명:** 현재 유튜브 쇼츠의 트렌드를 분석하여 즉시 제작 가능한 테마 제안.
+- **상세 로직:**
+    1. YouTube Data API를 통해 현재 인기 급상승 쇼츠 리스트 추출.
+    2. Gemini API가 제목, 태그, 자막(있는 경우)을 분석하여 현재 유행하는 '시각적 문법' 및 '오디오 패턴' 파악.
+    3. 한국(K-Trend)과 글로벌(Global) 시장의 차이점을 대조 분석하여 리포트 제공.
+    4. **Output:** 아이디어 3종 (제목 후보, 후킹 전략, 3단 구성 스크립트 가이드).
+
+### 기능 2: 아웃라이어 역설계 (Outlier Reverse-Engineer)
+- **설명:** 구독자 대비 조회수가 비정상적으로 높은 영상을 분석하여 성공 공식 추출.
+- **상세 로직:**
+    1. 사용자가 특정 키워드 입력 시 관련 영상 데이터 수집.
+    2. **지표 산출:** `조회수 / 구독자 수` 비율이 10배~1000배인 영상 필터링.
+    3. Gemini API가 해당 영상의 '성공 치트키(후킹 포인트, 댓글 반응)'를 역설계.
+    4. **Output:** 벤치마킹 포인트 요약, 적용 가능한 썸네일 카피, 시청 지속 시간 유도 전략.
+
+## 4. 사용자 여정 (User Journey)
+1. **홈 화면:** 현재 인기 급상승 키워드를 시각화된 대시보드로 확인.
+2. **트렌드 분석:** '분석 시작' 버튼 클릭 시 실시간 트렌드 기반 아이디어 리스트 수령.
+3. **키워드 검색:** 특정 키워드 입력 후 '아웃라이어 찾기' 실행.
+4. **인사이트 확인:** AI가 분석한 영상 구조와 스크립트 가이드를 복사하여 제작에 활용.
+
+## 5. 데이터 구조 및 인터페이스 (No-DB 기준)
+- **YouTube API Key:** `.env.local`에서 관리.
+- **Gemini API Key:** `.env.local`에서 관리.
+- **임시 저장:** 브라우저 `LocalStorage`를 활용하여 최근 분석 내역 저장.
+- **Python Bridge:** Next.js API Routes에서 `child_process`를 통해 Python 자막 추출 스크립트 실행.
+
+## 6. 수익화 및 확장 로직
+- **Phase 1:** 개인용 자동화 툴로 활용하여 직접 수익형 채널 운영.
+- **Phase 2:** 글로벌 시장 타겟팅 기능을 강화하여 해외 크리에이터 대상 SaaS로 전환.
+- **Phase 3:** 분석된 아이디어를 바탕으로 AI 영상 생성 API와 연동하여 자동 제작 파이프라인 구축.
+
+## 7. AI 지시 가이드라인 (For Vibe Coding)
+- "모든 UI는 YouTube 다크모드 스타일과 shadcn/ui를 사용하여 세련되게 작성해줘."
+- "컴포넌트는 최대한 분리하여 재사용 가능하게 만들어줘."
+- "Gemini API 호출 시 시스템 프롬프트에 '전문 콘텐츠 전략가' 역할을 부여해줘."
