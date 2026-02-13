@@ -37,20 +37,20 @@ export async function GET(request: NextRequest) {
                         console.error('[Kakao Login] Failed to parse private key as JSON', e);
                     }
                 }
+            }
 
-                // After JSON parsing, ensure privateKey is still valid
-                if (privateKey) {
-                    // Remove wrapping double quotes if accidentally pasted in Vercel
-                    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-                        privateKey = privateKey.slice(1, -1);
-                    }
-                    // Handle escaped newlines
-                    privateKey = privateKey.replace(/\\n/g, '\n');
+            // After all parsing, check if we have a valid key
+            if (privateKey) {
+                // Remove wrapping double quotes if accidentally pasted in Vercel
+                if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+                    privateKey = privateKey.slice(1, -1);
+                }
+                // Handle escaped newlines
+                privateKey = privateKey.replace(/\\n/g, '\n');
 
-                    // Add PEM headers if missing (Common Vercel copy-paste error)
-                    if (!privateKey.startsWith('-----BEGIN PRIVATE KEY-----')) {
-                        privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----\n`;
-                    }
+                // Add PEM headers if missing (Common Vercel copy-paste error)
+                if (!privateKey.startsWith('-----BEGIN PRIVATE KEY-----')) {
+                    privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----\n`;
                 }
             }
 
