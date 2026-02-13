@@ -32,6 +32,7 @@ export async function GET(request: Request) {
 
         // 1. Fetch Trending Shorts via Search
         console.log(`[API] Starting ${regionInfo.code} (${regionInfo.name}) trends fetch...`);
+
         const youtubeResponse = await axios.get('https://www.googleapis.com/youtube/v3/search', {
             params: {
                 part: 'snippet',
@@ -165,7 +166,27 @@ export async function GET(request: Request) {
         });
 
     } catch (error: any) {
-        console.error('Trend API Error:', error.message, error.stack);
-        return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 });
+        console.error('=== Trend API Error ===');
+        console.error('Error message:', error.message);
+
+        // Log detailed axios error if available
+        if (error.response) {
+            console.error('YouTube API Response Status:', error.response.status);
+            console.error('YouTube API Response Data:', JSON.stringify(error.response.data, null, 2));
+
+            // Return specific error information from YouTube API
+            return NextResponse.json({
+                error: 'YouTube API Error',
+                status: error.response.status,
+                details: error.response.data?.error?.message || error.message,
+                reason: error.response.data?.error?.errors?.[0]?.reason || 'Unknown'
+            }, { status: 500 });
+        }
+
+        console.error('Error stack:', error.stack);
+        return NextResponse.json({
+            error: 'Internal Server Error',
+            details: error.message
+        }, { status: 500 });
     }
 }

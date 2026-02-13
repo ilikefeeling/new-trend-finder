@@ -1,0 +1,82 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function: Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function: Check if user is admin
+    // Checks the 'role' field in the user's Firestore document
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Helper function: Check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Users can read their own data, Admins can read all
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Users can update their own data, but not subscription tier or role
+      allow update: if isOwner(userId) && 
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['role', 'subscription.tier', 'subscription.status']);
+      
+      // Only system can create users (via Firebase Functions)
+      allow create: if isAuthenticated();
+      
+      // Only admins can delete users
+      allow delete: if isAdmin();
+    }
+    
+    // Transactions collection
+    match /transactions/{transactionId} {
+      // Admins can read all transactions
+      allow read: if isAdmin();
+      
+      // Authenticated users can create transactions
+      allow create: if isAuthenticated();
+      
+      // Only admins can update or delete transactions
+      allow update, delete: if isAdmin();
+    }
+    
+    // User analyses collection (saved analysis history)
+    match /user_analyses/{analysisId} {
+      // Users can read their own analyses
+      allow read: if isAuthenticated() && resource.data.user_id == request.auth.uid;
+      
+      // Users can create their own analyses
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+      
+      // Users can delete their own analyses
+      allow delete: if isAuthenticated() && resource.data.user_id == request.auth.uid;
+      
+      // Admins can read all
+      allow read: if isAdmin();
+    }
+    
+    // Admin logs collection
+    match /admin_logs/{logId} {
+      // Only admins can access admin logs
+      allow read, write: if isAdmin();
+    }
+    
+    // System settings collection
+    match /settings/{settingId} {
+      // Everyone can read settings
+      allow read: if true;
+      
+      // Only admins can write settings
+      allow write: if isAdmin();
+    }
+  }
+}

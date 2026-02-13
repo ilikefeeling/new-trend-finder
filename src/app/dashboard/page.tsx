@@ -7,10 +7,36 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, TrendingUp, Sparkles, Youtube, Globe, Languages, HelpCircle, BookOpen, CheckCircle2 } from "lucide-react";
+import { Loader2, Search, TrendingUp, Sparkles, Youtube, Globe, Languages, HelpCircle, BookOpen, CheckCircle2, Shield } from "lucide-react";
+import UserProfile from "@/components/UserProfile";
+import { useSubscription } from "@/hooks/useSubscription";
+import UpgradePrompt from "@/components/UpgradePrompt";
+import FreeTierUsageModal from "@/components/FreeTierUsageModal";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
+    const { checkUsageLimit, isPro } = useSubscription();
+    const { user } = useAuth(); // Get current user to check admin role
+    const router = useRouter(); // Add router for navigation
     const [isTrendLoading, setIsTrendLoading] = useState(false);
+    const [showFreeUsageModal, setShowFreeUsageModal] = useState(false);
+
+    // Debug: Check user role
+    useEffect(() => {
+        console.log('Current user:', user);
+        console.log('User role:', user?.role);
+        console.log('Is admin?', user?.role === 'admin');
+    }, [user]);
+
+    useEffect(() => {
+        // Show free usage modal once per session for free users
+        if (user && !isPro() && !sessionStorage.getItem('freeUsageShown')) {
+            setShowFreeUsageModal(true);
+            sessionStorage.setItem('freeUsageShown', 'true');
+        }
+    }, [user, isPro]);
+
     const [trendData, setTrendData] = useState<any>(null);
     const [region, setRegion] = useState('KR');
     const [keyword, setKeyword] = useState('');
@@ -18,6 +44,7 @@ export default function Dashboard() {
     const [outlierData, setOutlierData] = useState<any>(null);
     const [viralPlans, setViralPlans] = useState<any[]>([]);
     const [isViralLoading, setIsViralLoading] = useState(false);
+    const [showUpgradePrompt, setShowUpgradePrompt] = useState<{ show: boolean; feature: string; type?: 'trend' | 'keyword' }>({ show: false, feature: '' });
 
     const REGIONS = [
         { code: 'KR', label: 'Korea 🇰🇷' },
@@ -31,13 +58,32 @@ export default function Dashboard() {
     ];
 
     const fetchTrends = async () => {
+        // Check usage limit for free users
+        const usageCheck = checkUsageLimit('trend');
+        if (!usageCheck.allowed) {
+            setShowUpgradePrompt({ show: true, feature: '트렌드 분석', type: 'trend' });
+            return;
+        }
+
         setIsTrendLoading(true);
+        setTrendData(null); // Reset previous data
         try {
             const res = await fetch(`/api/trend?region=${region}`);
             const data = await res.json();
+
+            // Check if API returned an error
+            if (!res.ok || data.error) {
+                console.error('API Error:', data.error || data.details);
+                alert(`트렌드 분석 실패: ${data.error || '알 수 없는 오류'}\n${data.details || ''}`);
+                setTrendData(null);
+                return;
+            }
+
             setTrendData(data);
         } catch (e) {
-            console.error(e);
+            console.error('Fetch error:', e);
+            alert('트렌드 데이터를 가져오는데 실패했습니다. 잠시 후 다시 시도해주세요.');
+            setTrendData(null);
         } finally {
             setIsTrendLoading(false);
         }
@@ -46,6 +92,14 @@ export default function Dashboard() {
     const findOutliers = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!keyword) return;
+
+        // Check usage limit for free users
+        const usageCheck = checkUsageLimit('keyword');
+        if (!usageCheck.allowed) {
+            setShowUpgradePrompt({ show: true, feature: '키워드 검색', type: 'keyword' });
+            return;
+        }
+
         setIsOutlierLoading(true);
         setViralPlans([]); // Reset previous plans
         try {
@@ -96,7 +150,25 @@ export default function Dashboard() {
                     <Youtube className="w-8 h-8 text-primary" />
                     <h1 className="text-2xl font-bold tracking-tighter">Next Shorts</h1>
                 </div>
-                <Badge variant="outline" className="text-muted-foreground border-primary/20">Beta v1.0</Badge>
+                <div className="flex items-center gap-4">
+                    <Badge variant="outline" className="text-muted-foreground border-primary/20">Beta v1.0</Badge>
+                    {/* Admin Panel Button - Only visible for admin users */}
+                    {user?.role === 'admin' && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 border-primary/20 hover:bg-primary/10 transition-colors"
+                            onClick={() => {
+                                console.log('Admin Panel button clicked, navigating to /admin');
+                                router.push('/admin');
+                            }}
+                        >
+                            <Shield className="w-4 h-4" />
+                            Admin Panel
+                        </Button>
+                    )}
+                    <UserProfile />
+                </div>
             </header>
 
             <main className="w-full max-w-6xl space-y-8">
@@ -438,10 +510,23 @@ export default function Dashboard() {
                     </TabsContent>
                 </Tabs>
             </main>
-
-            <footer className="mt-20 py-8 text-center text-xs text-muted-foreground">
-                © 2024 Next Shorts. For Content Creators.
+            <footer className="w-full max-w-6xl text-center text-sm text-muted-foreground mt-12">
+                <p>Made with ❤️ by the Next Shorts Team</p>
             </footer>
+
+            {/* Free Usage Modal */}
+            {showFreeUsageModal && (
+                <FreeTierUsageModal onClose={() => setShowFreeUsageModal(false)} />
+            )}
+
+            {/* Upgrade Prompt Modal */}
+            {showUpgradePrompt.show && (
+                <UpgradePrompt
+                    feature={showUpgradePrompt.feature}
+                    usageType={showUpgradePrompt.type}
+                    onClose={() => setShowUpgradePrompt({ show: false, feature: '' })}
+                />
+            )}
         </div>
     );
 }
