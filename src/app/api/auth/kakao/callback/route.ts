@@ -25,6 +25,19 @@ export async function GET(request: NextRequest) {
             let privateKey = process.env.FIREBASE_PRIVATE_KEY;
             if (privateKey) {
                 privateKey = privateKey.trim();
+
+                // Handle case where user pasted the entire Service Account JSON file
+                if (privateKey.startsWith('{')) {
+                    try {
+                        const jsonKey = JSON.parse(privateKey);
+                        if (jsonKey.private_key) {
+                            privateKey = jsonKey.private_key;
+                        }
+                    } catch (e) {
+                        console.error('[Kakao Login] Failed to parse private key as JSON', e);
+                    }
+                }
+
                 // Remove wrapping double quotes if accidentally pasted in Vercel
                 if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
                     privateKey = privateKey.slice(1, -1);
