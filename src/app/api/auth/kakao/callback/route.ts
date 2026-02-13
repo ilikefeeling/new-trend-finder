@@ -138,8 +138,9 @@ export async function GET(request: NextRequest) {
         console.log('[Kakao Login] Login successful, redirecting with token');
         return NextResponse.redirect(redirectUrl);
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('[Kakao Login] Unhandled error:', error);
-        return NextResponse.redirect(new URL('/login?error=auth_failed', request.url));
+        const errorMessage = encodeURIComponent(error.message || 'Unknown error');
+        return NextResponse.redirect(new URL(`/login?error=auth_failed&message=${errorMessage}`, request.url));
     }
 }
