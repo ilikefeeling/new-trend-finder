@@ -74,7 +74,11 @@ export async function GET(request: NextRequest) {
                 console.log('[Kakao Login] Firebase Admin initialized successfully in route');
             } catch (initError: any) {
                 console.error('[Kakao Login] Firebase Admin init failed:', initError);
-                throw new Error(`Firebase Admin Init Error: ${initError.message}`);
+                // Create a masked debug string for the user to help diagnose (safe to show start/end)
+                const keyDebug = privateKey ?
+                    `[Length: ${privateKey.length}, Start: '${privateKey.substring(0, 20)}...', End: '...${privateKey.substring(privateKey.length - 20)}']` :
+                    '[Key is null]';
+                throw new Error(`Firebase Admin Init Error: ${initError.message} ${keyDebug}`);
             }
         }
 
