@@ -18,6 +18,20 @@ export async function GET(request: NextRequest) {
         const origin = request.nextUrl.origin;
         const redirectUri = `${origin}/api/auth/kakao/callback`;
 
+        // Check Firebase Admin Initialization Status
+        if (admin.apps.length === 0) {
+            console.error('[Kakao Login] Firebase Admin user check failed: App not initialized');
+            const missing = [];
+            if (!process.env.FIREBASE_PRIVATE_KEY) missing.push('FIREBASE_PRIVATE_KEY');
+            if (!process.env.FIREBASE_PROJECT_ID) missing.push('FIREBASE_PROJECT_ID');
+            if (!process.env.FIREBASE_CLIENT_EMAIL) missing.push('FIREBASE_CLIENT_EMAIL');
+
+            if (missing.length > 0) {
+                throw new Error(`Server Config Error: Missing ${missing.join(', ')}`);
+            }
+            throw new Error('Server Config Error: Firebase Admin init failed (Check Private Key format)');
+        }
+
         if (!clientId) {
             console.error('Kakao callback error: Missing NEXT_PUBLIC_KAKAO_CLIENT_ID');
             return NextResponse.redirect(new URL('/login?error=config_error', request.url));
