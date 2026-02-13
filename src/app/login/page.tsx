@@ -21,7 +21,11 @@ function LoginContent() {
             const tokenParam = searchParams.get('token');
             const error = searchParams.get('error');
 
-            console.log('[Login Page] handleTokenLogin started', { tokenParam: !!tokenParam, error });
+            console.log('[Login Page] handleTokenLogin started', {
+                tokenParam: !!tokenParam,
+                error,
+                allParams: searchParams.toString()
+            });
 
             if (error) {
                 alert(`로그인 오류: ${error}`);
@@ -43,7 +47,13 @@ function LoginContent() {
             }
         };
 
-        console.log('[Login Page] Effect triggered', { loading, user: !!user, token, tokenLoginAttempted });
+        console.log('[Login Page] Effect triggered', {
+            loading,
+            user: !!user,
+            token,
+            tokenLoginAttempted,
+            allParams: searchParams.toString()
+        });
 
         if (!loading) {
             if (user) {
