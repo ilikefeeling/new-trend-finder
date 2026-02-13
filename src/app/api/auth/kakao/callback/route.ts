@@ -21,7 +21,17 @@ export async function GET(request: NextRequest) {
         // Check Firebase Admin Initialization Status
         if (admin.apps.length === 0) {
             console.log('[Kakao Login] Firebase Admin not initialized. Attempting to initialize...');
-            const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+            let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+            if (privateKey) {
+                // Remove wrapping double quotes if accidentally pasted in Vercel
+                if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+                    privateKey = privateKey.slice(1, -1);
+                }
+                // Handle escaped newlines
+                privateKey = privateKey.replace(/\\n/g, '\n');
+            }
+
             const projectId = process.env.FIREBASE_PROJECT_ID;
             const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 
