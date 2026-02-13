@@ -21,6 +21,8 @@ function LoginContent() {
             const tokenParam = searchParams.get('token');
             const error = searchParams.get('error');
 
+            console.log('[Login Page] handleTokenLogin started', { tokenParam: !!tokenParam, error });
+
             if (error) {
                 alert(`로그인 오류: ${error}`);
                 setTokenLoginAttempted(true);
@@ -29,22 +31,32 @@ function LoginContent() {
 
             if (tokenParam) {
                 try {
+                    console.log('[Login Page] Attempting signInWithCustomToken...');
                     await signInWithCustomToken(auth, tokenParam);
+                    console.log('[Login Page] signInWithCustomToken success. Redirecting to /dashboard');
                     router.push('/dashboard');
                 } catch (err) {
-                    console.error('Token login failed:', err);
+                    console.error('[Login Page] Token login failed:', err);
                     alert('로그인에 실패했습니다.');
                     setTokenLoginAttempted(true);
                 }
             }
         };
 
+        console.log('[Login Page] Effect triggered', { loading, user: !!user, token, tokenLoginAttempted });
+
         if (!loading) {
             if (user) {
+                console.log('[Login Page] User already authenticated. Redirecting to /dashboard');
                 router.push('/dashboard');
             } else if (token && !tokenLoginAttempted) {
+                console.log('[Login Page] Token found, attempting login...');
                 handleTokenLogin();
+            } else {
+                console.log('[Login Page] No user, no token (or attempted), staying on login.');
             }
+        } else {
+            console.log('[Login Page] Loading is true, waiting...');
         }
     }, [user, loading, router, searchParams, token, tokenLoginAttempted]);
 
