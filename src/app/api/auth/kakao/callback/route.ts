@@ -20,16 +20,33 @@ export async function GET(request: NextRequest) {
 
         // Check Firebase Admin Initialization Status
         if (admin.apps.length === 0) {
-            console.error('[Kakao Login] Firebase Admin user check failed: App not initialized');
+            console.log('[Kakao Login] Firebase Admin not initialized. Attempting to initialize...');
+            const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+            const projectId = process.env.FIREBASE_PROJECT_ID;
+            const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+
             const missing = [];
-            if (!process.env.FIREBASE_PRIVATE_KEY) missing.push('FIREBASE_PRIVATE_KEY');
-            if (!process.env.FIREBASE_PROJECT_ID) missing.push('FIREBASE_PROJECT_ID');
-            if (!process.env.FIREBASE_CLIENT_EMAIL) missing.push('FIREBASE_CLIENT_EMAIL');
+            if (!privateKey) missing.push('FIREBASE_PRIVATE_KEY');
+            if (!projectId) missing.push('FIREBASE_PROJECT_ID');
+            if (!clientEmail) missing.push('FIREBASE_CLIENT_EMAIL');
 
             if (missing.length > 0) {
                 throw new Error(`Server Config Error: Missing ${missing.join(', ')}`);
             }
-            throw new Error('Server Config Error: Firebase Admin init failed (Check Private Key format)');
+
+            try {
+                admin.initializeApp({
+                    credential: admin.credential.cert({
+                        projectId,
+                        clientEmail,
+                        privateKey,
+                    }),
+                });
+                console.log('[Kakao Login] Firebase Admin initialized successfully in route');
+            } catch (initError: any) {
+                console.error('[Kakao Login] Firebase Admin init failed:', initError);
+                throw new Error(`Firebase Admin Init Error: ${initError.message}`);
+            }
         }
 
         if (!clientId) {
