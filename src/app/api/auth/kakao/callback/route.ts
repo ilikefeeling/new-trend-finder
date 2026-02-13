@@ -24,12 +24,18 @@ export async function GET(request: NextRequest) {
 
             let privateKey = process.env.FIREBASE_PRIVATE_KEY;
             if (privateKey) {
+                privateKey = privateKey.trim();
                 // Remove wrapping double quotes if accidentally pasted in Vercel
                 if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
                     privateKey = privateKey.slice(1, -1);
                 }
                 // Handle escaped newlines
                 privateKey = privateKey.replace(/\\n/g, '\n');
+
+                // Add PEM headers if missing (Common Vercel copy-paste error)
+                if (!privateKey.startsWith('-----BEGIN PRIVATE KEY-----')) {
+                    privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----\n`;
+                }
             }
 
             const projectId = process.env.FIREBASE_PROJECT_ID;
