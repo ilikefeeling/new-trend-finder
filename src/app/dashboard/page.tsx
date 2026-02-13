@@ -14,6 +14,7 @@ import UpgradePrompt from "@/components/UpgradePrompt";
 import FreeTierUsageModal from "@/components/FreeTierUsageModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function Dashboard() {
     const { checkUsageLimit, isPro } = useSubscription();
@@ -328,10 +329,12 @@ export default function Dashboard() {
                                                             rel="noopener noreferrer"
                                                             className="shrink-0"
                                                         >
-                                                            <img
+                                                            <Image
                                                                 src={vid.channelThumbnail}
                                                                 alt={vid.channelTitle}
-                                                                className="w-8 h-8 rounded-full border border-primary/20 hover:scale-110 transition-transform"
+                                                                width={32}
+                                                                height={32}
+                                                                className="rounded-full border border-primary/20 hover:scale-110 transition-transform"
                                                             />
                                                         </a>
                                                         <div className="min-w-0">

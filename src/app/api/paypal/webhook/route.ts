@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
-import { firestore } from '@/lib/firebase.config';
+import admin from '@/lib/firebase-admin';
+
+export const dynamic = 'force-dynamic';
 
 const PAYPAL_WEBHOOK_ID = process.env.PAYPAL_WEBHOOK_ID;
 
 export async function POST(request: NextRequest) {
     try {
         const webhookEvent = await request.json();
-
-        // Verify webhook signature (implement PayPal webhook verification)
-        // For production, you MUST verify the webhook signature
-        // See: https://developer.paypal.com/docs/api/webhooks/v1/#verify-webhook-signature
-
         const eventType = webhookEvent.event_type;
         const resource = webhookEvent.resource;
 
@@ -21,23 +17,18 @@ export async function POST(request: NextRequest) {
             case 'BILLING.SUBSCRIPTION.ACTIVATED':
                 await handleSubscriptionActivated(resource);
                 break;
-
             case 'BILLING.SUBSCRIPTION.CANCELLED':
                 await handleSubscriptionCancelled(resource);
                 break;
-
             case 'BILLING.SUBSCRIPTION.SUSPENDED':
                 await handleSubscriptionSuspended(resource);
                 break;
-
             case 'BILLING.SUBSCRIPTION.EXPIRED':
                 await handleSubscriptionExpired(resource);
                 break;
-
             case 'PAYMENT.SALE.COMPLETED':
                 await handlePaymentCompleted(resource);
                 break;
-
             default:
                 console.log('Unhandled webhook event type:', eventType);
         }
@@ -53,26 +44,23 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleSubscriptionActivated(resource: any) {
-    const userId = resource.custom_id; // We stored user ID in custom_id
+    const userId = resource.custom_id;
     const subscriptionId = resource.id;
 
     if (!userId) return;
 
-    const userRef = doc(firestore, 'users', userId);
-
-    await updateDoc(userRef, {
+    await admin.firestore().collection('users').doc(userId).update({
         'subscription.status': 'active',
         'subscription.paypal_subscription_id': subscriptionId,
-        'subscription.started_at': serverTimestamp(),
+        'subscription.started_at': admin.firestore.FieldValue.serverTimestamp(),
         'subscription.auto_renew': true,
     });
 
-    // Log transaction
-    await addDoc(collection(firestore, 'transactions'), {
+    await admin.firestore().collection('transactions').add({
         user_id: userId,
         type: 'subscription_activated',
         paypal_subscription_id: subscriptionId,
-        created_at: serverTimestamp(),
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
     });
 }
 
@@ -81,18 +69,16 @@ async function handleSubscriptionCancelled(resource: any) {
 
     if (!userId) return;
 
-    const userRef = doc(firestore, 'users', userId);
-
-    await updateDoc(userRef, {
+    await admin.firestore().collection('users').doc(userId).update({
         'subscription.status': 'canceled',
         'subscription.auto_renew': false,
     });
 
-    await addDoc(collection(firestore, 'transactions'), {
+    await admin.firestore().collection('transactions').add({
         user_id: userId,
         type: 'subscription_cancelled',
         paypal_subscription_id: resource.id,
-        created_at: serverTimestamp(),
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
     });
 }
 
@@ -101,9 +87,7 @@ async function handleSubscriptionSuspended(resource: any) {
 
     if (!userId) return;
 
-    const userRef = doc(firestore, 'users', userId);
-
-    await updateDoc(userRef, {
+    await admin.firestore().collection('users').doc(userId).update({
         'subscription.status': 'suspended',
     });
 }
@@ -113,24 +97,21 @@ async function handleSubscriptionExpired(resource: any) {
 
     if (!userId) return;
 
-    const userRef = doc(firestore, 'users', userId);
-
-    await updateDoc(userRef, {
+    await admin.firestore().collection('users').doc(userId).update({
         'subscription.status': 'expired',
         'subscription.tier': 'free',
     });
 }
 
 async function handlePaymentCompleted(resource: any) {
-    // Log successful payment
     const billingAgreementId = resource.billing_agreement_id;
 
-    await addDoc(collection(firestore, 'transactions'), {
+    await admin.firestore().collection('transactions').add({
         type: 'payment_completed',
         paypal_transaction_id: resource.id,
         billing_agreement_id: billingAgreementId,
         amount: resource.amount.total,
         currency: resource.amount.currency,
-        created_at: serverTimestamp(),
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
     });
 }

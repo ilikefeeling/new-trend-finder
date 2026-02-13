@@ -13,7 +13,14 @@ export default function PricingPage() {
     const router = useRouter();
     const { user, getTierName } = useSubscription();
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
-    const [prices, setPrices] = useState({ pro: 9, enterprise: 99 });
+    const [prices, setPrices] = useState<{
+        pro: number;
+        enterprise: number;
+        proMonthlyId?: string;
+        proAnnualId?: string;
+        enterpriseMonthlyId?: string;
+        enterpriseAnnualId?: string;
+    }>({ pro: 9, enterprise: 99 });
 
     // Fetch pricing from Firestore
     useEffect(() => {
@@ -195,15 +202,9 @@ export default function PricingPage() {
                                         <CardTitle className="text-2xl">{tier.name}</CardTitle>
                                     </div>
                                     <CardDescription>{tier.description}</CardDescription>
-                                    <div className="mt-4">
-                                        <span className="text-4xl font-bold">
-                                            ${tier.price}
-                                        </span>
-                                        {tier.price > 0 && (
-                                            <span className="text-muted-foreground ml-2">
-                                                /{billingCycle === 'monthly' ? '월' : '년'}
-                                            </span>
-                                        )}
+                                    <div className="mb-6">
+                                        <span className="text-3xl font-bold">${Number(tier.price).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                                        {tier.price > 0 && <span className="text-muted-foreground">/{billingCycle === 'monthly' ? '월' : '년'}</span>}
                                     </div>
                                 </CardHeader>
 
@@ -247,14 +248,60 @@ export default function PricingPage() {
                                         >
                                             <div className="w-full">
                                                 <PayPalButtons
+                                                    key={`${tier.id}-${billingCycle}`}
                                                     style={{ layout: 'vertical', label: 'subscribe' }}
                                                     createSubscription={async (data, actions) => {
-                                                        // TODO: Implement subscription creation
-                                                        return '';
+                                                        try {
+                                                            const PAYPAL_PLAN_IDS = {
+                                                                pro: {
+                                                                    monthly: prices.proMonthlyId || process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_PRO_MONTHLY,
+                                                                    annual: prices.proAnnualId || process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_PRO_ANNUAL,
+                                                                },
+                                                                enterprise: {
+                                                                    monthly: prices.enterpriseMonthlyId || process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ENTERPRISE_MONTHLY,
+                                                                    annual: prices.enterpriseAnnualId || process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ENTERPRISE_ANNUAL,
+                                                                },
+                                                            };
+                                                            // Determine Plan ID based on tier and billing cycle
+                                                            const planId = PAYPAL_PLAN_IDS[tier.id as keyof typeof PAYPAL_PLAN_IDS]?.[billingCycle] || tier.id;
+
+                                                            const response = await fetch('/api/paypal/subscription/create', {
+                                                                method: 'POST',
+                                                                headers: {
+                                                                    'Content-Type': 'application/json',
+                                                                    'user-email': user?.email || '',
+                                                                },
+                                                                body: JSON.stringify({
+                                                                    planId: planId,
+                                                                    userId: user?.uid,
+                                                                }),
+                                                            });
+
+                                                            const result = await response.json();
+
+                                                            if (!response.ok) {
+                                                                const errorDetails = result.details ? JSON.stringify(result.details) : '';
+                                                                throw new Error(result.error + (errorDetails ? ` Details: ${errorDetails}` : '') || 'Subscription creation failed');
+                                                            }
+
+                                                            return result.subscriptionId;
+                                                        } catch (error) {
+                                                            console.error('Subscription error:', error);
+                                                            alert('구독 생성 중 오류가 발생했습니다. 관리자에게 문의하세요.');
+                                                            throw error;
+                                                        }
                                                     }}
                                                     onApprove={async (data, actions) => {
-                                                        // TODO: Implement subscription approval
                                                         console.log('Subscription approved:', data);
+                                                        // Redirect to success page or show success message
+                                                        // The return_url in the API should handle the redirect, 
+                                                        // but the JS SDK might also trigger this.
+                                                        alert('구독이 성공적으로 완료되었습니다!');
+                                                        router.push('/dashboard');
+                                                    }}
+                                                    onError={(err) => {
+                                                        console.error('PayPal Error:', err);
+                                                        alert('결제 창을 로드하는 중 오류가 발생했습니다.');
                                                     }}
                                                 />
                                             </div>

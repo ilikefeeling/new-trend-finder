@@ -1,32 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAccessToken, PAYPAL_API_BASE } from '@/lib/paypal';
 
-const PAYPAL_API_BASE = process.env.PAYPAL_MODE === 'live'
-    ? 'https://api-m.paypal.com'
-    : 'https://api-m.sandbox.paypal.com';
-
-const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
-const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
-
-// Get PayPal access token
-async function getAccessToken() {
-    const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
-
-    const response = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Basic ${auth}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'grant_type=client_credentials',
-    });
-
-    const data = await response.json();
-    return data.access_token;
-}
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
     try {
-        const { planId, userId } = await request.json();
+        let { planId, userId } = await request.json();
+        planId = planId?.trim();
 
         if (!planId || !userId) {
             return NextResponse.json(
@@ -37,6 +17,31 @@ export async function POST(request: NextRequest) {
 
         const accessToken = await getAccessToken();
 
+        const userEmail = request.headers.get('user-email');
+
+        const subscriptionPayload: any = {
+            plan_id: planId,
+            application_context: {
+                brand_name: 'Next Shorts',
+                locale: 'ko-KR',
+                shipping_preference: 'NO_SHIPPING',
+                user_action: 'SUBSCRIBE_NOW',
+                payment_method: {
+                    payer_selected: 'PAYPAL',
+                    payee_preferred: 'IMMEDIATE_PAYMENT_REQUIRED',
+                },
+                return_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/paypal/subscription/success?userId=${userId}`,
+                cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?canceled=true`,
+            },
+            custom_id: userId, // Store user ID for webhook processing
+        };
+
+        if (userEmail) {
+            subscriptionPayload.subscriber = {
+                email_address: userEmail,
+            };
+        }
+
         // Create subscription
         const subscriptionResponse = await fetch(`${PAYPAL_API_BASE}/v1/billing/subscriptions`, {
             method: 'POST',
@@ -44,25 +49,7 @@ export async function POST(request: NextRequest) {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                plan_id: planId,
-                subscriber: {
-                    email_address: request.headers.get('user-email') || '',
-                },
-                application_context: {
-                    brand_name: 'Next Shorts',
-                    locale: 'ko-KR',
-                    shipping_preference: 'NO_SHIPPING',
-                    user_action: 'SUBSCRIBE_NOW',
-                    payment_method: {
-                        payer_selected: 'PAYPAL',
-                        payee_preferred: 'IMMEDIATE_PAYMENT_REQUIRED',
-                    },
-                    return_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/paypal/subscription/success?userId=${userId}`,
-                    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?canceled=true`,
-                },
-                custom_id: userId, // Store user ID for webhook processing
-            }),
+            body: JSON.stringify(subscriptionPayload),
         });
 
         if (!subscriptionResponse.ok) {

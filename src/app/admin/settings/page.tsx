@@ -21,15 +21,37 @@ export default function SettingsPage() {
         paypal: '****************************',
     });
 
-    const [pricing, setPricing] = useState({
+    const [pricing, setPricing] = useState<{
+        pro: number;
+        enterprise: number;
+        proMonthlyId?: string;
+        proAnnualId?: string;
+        enterpriseMonthlyId?: string;
+        enterpriseAnnualId?: string;
+    }>({
         pro: 9,
         enterprise: 99,
+        proMonthlyId: '',
+        proAnnualId: '',
+        enterpriseMonthlyId: '',
+        enterpriseAnnualId: '',
     });
 
     const [limits, setLimits] = useState({
         freeTrendLimit: 3,
         freeKeywordLimit: 5
     });
+
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
+    const handleSaveClick = () => {
+        setIsConfirmOpen(true);
+    };
+
+    const handleConfirmSave = async () => {
+        setIsConfirmOpen(false);
+        await savePricing();
+    };
 
     useEffect(() => {
         fetchSettings();
@@ -53,15 +75,80 @@ export default function SettingsPage() {
         }
     };
 
+    const ensureProductExists = async (currentSettings: any) => {
+        if (currentSettings.paypalProductId) return currentSettings.paypalProductId;
+
+        try {
+            const response = await fetch('/api/paypal/create-product', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: 'Next Shorts Subscription', description: 'Auto-created product for subscriptions' })
+            });
+            const data = await response.json();
+            if (data.productId) {
+                // Save product ID immediately
+                const docRef = doc(firestore, 'settings', 'global');
+                await setDoc(docRef, { paypalProductId: data.productId }, { merge: true });
+                return data.productId;
+            }
+        } catch (error) {
+            console.error('Failed to create product:', error);
+            throw new Error('PayPal Product 생성 실패');
+        }
+        return null;
+    };
+
+    const createNewPlan = async (productId: string, name: string, price: number, interval: 'MONTH' | 'YEAR') => {
+        const response = await fetch('/api/paypal/create-plan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                productId,
+                name,
+                description: `${name} Subscription`,
+                price,
+                intervalUnit: interval,
+                intervalCount: 1
+            })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.details || 'Plan creation failed');
+        return data.planId;
+    };
+
     const savePricing = async () => {
         setSaving(true);
         try {
             const docRef = doc(firestore, 'settings', 'global');
-            await setDoc(docRef, { pricing }, { merge: true });
-            toast.success('가격 설정이 저장되었습니다.');
+            const docSnap = await getDoc(docRef);
+            const currentSettings = docSnap.exists() ? docSnap.data() : {};
+            const oldPricing = currentSettings.pricing || {};
+
+            let productId = await ensureProductExists(currentSettings);
+            if (!productId) throw new Error('PayPal Product ID를 찾을 수 없습니다.');
+
+            const newPricing = { ...pricing };
+
+            // Check if Pro Price changed
+            if (pricing.pro !== oldPricing.pro) {
+                toast.info('Pro 플랜 가격 변경 감지: 새 PayPal Plan 생성 중...');
+                newPricing.proMonthlyId = await createNewPlan(productId, 'Pro Monthly', pricing.pro, 'MONTH');
+                newPricing.proAnnualId = await createNewPlan(productId, 'Pro Annual', pricing.pro * 10, 'YEAR'); // Assuming 10x for annual
+            }
+
+            // Check if Enterprise Price changed
+            if (pricing.enterprise !== oldPricing.enterprise) {
+                toast.info('Enterprise 플랜 가격 변경 감지: 새 PayPal Plan 생성 중...');
+                newPricing.enterpriseMonthlyId = await createNewPlan(productId, 'Enterprise Monthly', pricing.enterprise, 'MONTH');
+                newPricing.enterpriseAnnualId = await createNewPlan(productId, 'Enterprise Annual', pricing.enterprise * 10, 'YEAR');
+            }
+
+            await setDoc(docRef, { pricing: newPricing }, { merge: true });
+            setPricing(newPricing);
+            toast.success('가격 및 PayPal 플랜이 성공적으로 업데이트되었습니다.');
         } catch (error) {
             console.error('Error saving pricing:', error);
-            toast.error('가격 설정 저장 실패');
+            toast.error(`저장 실패: ${(error as Error).message}`);
         } finally {
             setSaving(false);
         }
@@ -132,42 +219,108 @@ export default function SettingsPage() {
                         구독 플랜 가격 조정 (저장 시 실시간 반영)
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div>
-                        <label className="text-sm font-medium mb-2 block">Pro 플랜 (월간)</label>
-                        <div className="flex gap-2 items-center">
-                            <span className="text-2xl font-bold">$</span>
-                            <Input
-                                type="number"
-                                value={pricing.pro}
-                                onChange={(e) => setPricing({ ...pricing, pro: Number(e.target.value) })}
-                                className="max-w-32"
-                            />
-                            <span className="text-muted-foreground">/월</span>
-                        </div>
-                    </div>
+                <CardContent className="space-y-6">
+                    <div className="grid gap-6 md:grid-cols-2">
+                        {/* Pro Plan */}
+                        <div className="space-y-4 p-4 border rounded-lg">
+                            <h3 className="font-semibold text-lg flex items-center gap-2">
+                                <Zap className="w-4 h-4 text-yellow-500" /> Pro Plan
+                            </h3>
 
-                    <div>
-                        <label className="text-sm font-medium mb-2 block">Enterprise 플랜 (월간)</label>
-                        <div className="flex gap-2 items-center">
-                            <span className="text-2xl font-bold">$</span>
-                            <Input
-                                type="number"
-                                value={pricing.enterprise}
-                                onChange={(e) => setPricing({ ...pricing, enterprise: Number(e.target.value) })}
-                                className="max-w-32"
-                            />
-                            <span className="text-muted-foreground">/월</span>
+                            <div>
+                                <label className="text-sm font-medium mb-1.5 block">월간 가격 ($)</label>
+                                <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={pricing.pro}
+                                    onChange={(e) => setPricing({ ...pricing, pro: Number(e.target.value) })}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-medium mb-1.5 block">Monthly Plan ID</label>
+                                <Input
+                                    value={pricing.proMonthlyId || ''}
+                                    onChange={(e) => setPricing({ ...pricing, proMonthlyId: e.target.value })}
+                                    placeholder="P-..."
+                                    className="font-mono text-xs"
+                                />
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                    Env: {process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_PRO_MONTHLY}
+                                </p>
+                                <p className="text-[10px] text-red-500 mt-0.5">
+                                    * Plan ID는 대소문자를 구분하며 'P-'로 시작해야 합니다.
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-medium mb-1.5 block">Annual Plan ID</label>
+                                <Input
+                                    value={pricing.proAnnualId || ''}
+                                    onChange={(e) => setPricing({ ...pricing, proAnnualId: e.target.value })}
+                                    placeholder="P-..."
+                                    className="font-mono text-xs"
+                                />
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                    Env: {process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_PRO_ANNUAL}
+                                </p>
+                                <p className="text-[10px] text-red-500 mt-0.5">
+                                    * Plan ID는 대소문자를 구분하며 'P-'로 시작해야 합니다.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Enterprise Plan */}
+                        <div className="space-y-4 p-4 border rounded-lg">
+                            <h3 className="font-semibold text-lg flex items-center gap-2">
+                                <Users className="w-4 h-4 text-blue-500" /> Enterprise Plan
+                            </h3>
+
+                            <div>
+                                <label className="text-sm font-medium mb-1.5 block">월간 가격 ($)</label>
+                                <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={pricing.enterprise}
+                                    onChange={(e) => setPricing({ ...pricing, enterprise: Number(e.target.value) })}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-medium mb-1.5 block">Monthly Plan ID</label>
+                                <Input
+                                    value={pricing.enterpriseMonthlyId || ''}
+                                    onChange={(e) => setPricing({ ...pricing, enterpriseMonthlyId: e.target.value })}
+                                    placeholder="P-..."
+                                    className="font-mono text-xs"
+                                />
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                    Env: {process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ENTERPRISE_MONTHLY}
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-medium mb-1.5 block">Annual Plan ID</label>
+                                <Input
+                                    value={pricing.enterpriseAnnualId || ''}
+                                    onChange={(e) => setPricing({ ...pricing, enterpriseAnnualId: e.target.value })}
+                                    placeholder="P-..."
+                                    className="font-mono text-xs"
+                                />
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                    Env: {process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ENTERPRISE_ANNUAL}
+                                </p>
+                            </div>
                         </div>
                     </div>
 
                     <div className="pt-4 border-t">
-                        <Button onClick={savePricing} disabled={saving}>
+                        <Button onClick={handleSaveClick} disabled={saving}>
                             {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                            가격 변경 적용
+                            가격 및 플랜 저장
                         </Button>
                         <p className="text-xs text-muted-foreground mt-2">
-                            주의: 가격 변경은 신규 구독자에게만 적용됩니다.
+                            PayPal Plan이 자동으로 생성/업데이트됩니다. 필요시 수동으로 ID를 수정할 수도 있습니다.
                         </p>
                     </div>
                 </CardContent>
@@ -219,6 +372,29 @@ export default function SettingsPage() {
                     </div>
                 </CardContent>
             </Card>
-        </div>
+
+            {/* Confirmation Modal */}
+            {
+                isConfirmOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+                        <div className="bg-card border rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
+                            <h3 className="text-lg font-semibold mb-2">변경사항 저장 확인</h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                가격 정책 및 플랜 ID가 변경됩니다.<br />
+                                정말 저장하시겠습니까?
+                            </p>
+                            <div className="flex justify-end gap-2">
+                                <Button variant="outline" onClick={() => setIsConfirmOpen(false)}>
+                                    취소
+                                </Button>
+                                <Button onClick={handleConfirmSave}>
+                                    확인
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 }

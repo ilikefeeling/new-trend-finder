@@ -105,7 +105,7 @@ export default function ProfilePage() {
                                         <Calendar className="w-4 h-4" /> 가입일
                                     </span>
                                     <span className="font-medium">
-                                        {user.createdAt?.toDate ? user.createdAt.toDate().toLocaleDateString() : 'N/A'}
+                                        {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                                     </span>
                                 </div>
                             </div>

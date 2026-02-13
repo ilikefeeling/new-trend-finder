@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import KakaoLoginButton from '@/components/KakaoLoginButton';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,23 +13,28 @@ function LoginContent() {
     const searchParams = useSearchParams();
     const { user, loading } = useAuth();
 
+    const [tokenLoginAttempted, setTokenLoginAttempted] = useState(false);
+    const token = searchParams.get('token');
+
     useEffect(() => {
         const handleTokenLogin = async () => {
-            const token = searchParams.get('token');
+            const tokenParam = searchParams.get('token');
             const error = searchParams.get('error');
 
             if (error) {
                 alert(`로그인 오류: ${error}`);
+                setTokenLoginAttempted(true);
                 return;
             }
 
-            if (token) {
+            if (tokenParam) {
                 try {
-                    await signInWithCustomToken(auth, token);
+                    await signInWithCustomToken(auth, tokenParam);
                     router.push('/dashboard');
                 } catch (err) {
                     console.error('Token login failed:', err);
                     alert('로그인에 실패했습니다.');
+                    setTokenLoginAttempted(true);
                 }
             }
         };
@@ -37,13 +42,13 @@ function LoginContent() {
         if (!loading) {
             if (user) {
                 router.push('/dashboard');
-            } else {
+            } else if (token && !tokenLoginAttempted) {
                 handleTokenLogin();
             }
         }
-    }, [user, loading, router, searchParams]);
+    }, [user, loading, router, searchParams, token, tokenLoginAttempted]);
 
-    if (loading) {
+    if (loading || user || (token && !tokenLoginAttempted)) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-background">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>

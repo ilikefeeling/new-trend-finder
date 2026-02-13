@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic';
 import axios from 'axios';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getVideoTranscript } from '@/lib/python_bridge';

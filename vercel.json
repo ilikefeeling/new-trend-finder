@@ -1,0 +1,10 @@
+{
+    "name": "new-trend-finder",
+    "framework": "nextjs",
+    "rewrites": [
+        {
+            "source": "/api/(.*)",
+            "destination": "/api/$1"
+        }
+    ]
+}
